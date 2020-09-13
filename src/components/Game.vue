@@ -55,6 +55,15 @@ export default {
       playerTurn: false, // false - X eilė. true - O eilė
       winner: null, // laimėtojas. false - X, true - O, null - nėra laimėtojo.
       gameEnd: false, // true, jei žaidimas baigtas.
+
+      /**
+       * TRUE, jei sukelti praeito žaidimo duomenys.
+       * FALSE, jei nesukelti.
+       * Paleidžiant puslapį kreipiamasi į backend, siekiant rasti buvusius veiksmus ir užpildyti lentelę,
+       * jeigu tokių veiksmų buvo rasta. Kol duomenys negauti, šis kintamasi yra FALSE ir neleidžia atlikti jokio
+       * veiksmo lentelėje.
+       */
+      lastGameDataAssigned: false,
       actions: [],
     };
   },
@@ -80,6 +89,7 @@ export default {
           Vue.set(vm.items[tblrow.row], tblrow.column, tblrow.player);
           vm.playerTurn = !tblrow.player;
         });
+        vm.lastGameDataAssigned = true; // Nurodome, kad praeito žaidimo duomenys sėkmingai sukelti.
       })
       .catch((err) => {
         console.log(err);
@@ -190,6 +200,11 @@ export default {
      *  n:  Stulpelis
      */
     doClick(x, n) {
+      if (!this.lastGameDataAssigned) {
+        // Jeigu praeito žaidimo duomenys nesukelti, jeigu tokių buvo, neleisti jokio veiksmo.
+        return;
+      }
+
       if (this.gameEnd) {
         // Jeigu žaidimas pasibaigęs, pranešame.
         return alert("Žaidimas baigtas!");
