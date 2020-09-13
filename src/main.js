@@ -5,6 +5,7 @@ import axios from "axios";
 Vue.use({
   install(Vue) {
     Vue.prototype.$api = axios.create({
+      // Nurodome backend adresą, kuriuo kreipsimės užklausoms
       baseURL: "http://localhost:8000/api/",
     });
   },

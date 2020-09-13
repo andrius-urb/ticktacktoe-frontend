@@ -59,6 +59,11 @@ export default {
     };
   },
   beforeMount() {
+    /**
+     * Prieš paleidžiant puslapį, kreipiamės į backend ir ieškome, ar buvo prieš tai atlikta veiksmų.
+     * Jeigu veiksmų yra, reiškia žaidimas yra prasidėjęs ir laimėtojas yra arba ne, tačiau žaidimas nebuvo paleistas iš naujo,
+     * todėl žaidimas tęsiamas.
+     */
     var vm = this;
     this.$api
       .get("actions")
@@ -84,12 +89,11 @@ export default {
     items: {
       handler() {
         // tikriname ar kažkuris žaidėjas laimėjo
-        //var isX = false;
-        //var isO = true;
-        var isX = false;
-        var isO = true;
-        var checkPlayer = isX;
-        var result = true;
+
+        var isX = false; // žaidėjas X masyve "items" žymimas "false"
+        var isO = true; // žaidėjas O masyve "items" žymimas "true"
+        var checkPlayer = isX; // nurodo, kurį žaidėją tikrina ciklas
+        var result = true; // rezultatas, prieš pradedant naują tikrinimą, turi būti "true"
 
         /**
          * Tikriname įstrižai 0,0  1,1  2,2 laukelius
@@ -166,8 +170,12 @@ export default {
         var count = 0;
         for (a = 0; a < 3; a++) {
           count = count + this.items[a].filter((item) => item === null).length;
+          /**
+           * Jeigu randa bent vieną "null" reikšmę masyve "items", prie count pridedame rastą kiekį.
+           * "null" reikšmė reiškia, kad laukelis neužimtas nei X, nei O */
         }
         if (count == 0) {
+          // Jeigu "count" 0, t.y. nėra nei vienos "null" reikšmės masyve "items", reiškia, kad visi laukeliai užimti, ir laimėtojo nėra.
           return this.gameOver(null);
         }
       },
@@ -175,33 +183,52 @@ export default {
     },
   },
   methods: {
+    /***
+     * Funkcija, kuri vykdoma paspaudus ant bet kurio laukelio
+     * Parametrai:
+     *  x:  Eilutė
+     *  n:  Stulpelis
+     */
     doClick(x, n) {
       if (this.gameEnd) {
+        // Jeigu žaidimas pasibaigęs, pranešame.
         return alert("Žaidimas baigtas!");
       }
       if (this.items[x][n] !== null) {
+        // Jeigu paspaustas laukelis nėra "null", t.y. jau užimtas, pranešame.
         return alert("Laukelis užimtas!");
       }
+
+      // Į "actions" kintamąjį perduodame atliktą veiksmą, kuris žaidėjas, ant kurio laukelio paspaudė.
       this.actions.push([x, n, this.playerTurn]);
-      //console.table(this.actions);
+
+      // Pakeičiame masyvo "items" atitinkamoje vietoje reikšmę į false arba true, priklausomai, kurio žaidėjo eilė (this.playerTurn)
       Vue.set(this.items[x], n, this.playerTurn);
+
+      // Siunčiame duomenis į backend, kad įrašytų veiksmą į duomenų bazę
       this.$api
         .post("action", {
           player: this.playerTurn,
           row: x,
           col: n,
         })
-        .then(function (response) {
-          console.log(response);
-        })
         .catch(function (error) {
           console.log(error);
         });
 
-      //this.items[x][n] = this.playerTurn;
+      //  Pakeičiame "playerTurn" kintamąjį į priešingą buvusiam, taip nurodydami, kad dabar kito žaidėjo eilė.
       this.playerTurn = !this.playerTurn;
-      //console.table(this.items);
     },
+
+    /**
+     * Funkcija grąžinanti X, O arba jokio rezultato.
+     * Parametrai:
+     *  value:  Reikšmė, pagal kurią duodamas rezultatas.
+     * Galimi variantai:
+     *  null:   Grąžina tuščią tekstą
+     *  true:   Grąžina "O"
+     *  false:  Grąžina "X"
+     */
     isItZeroOrCross(value) {
       if (value === null) {
         return "";
@@ -212,10 +239,24 @@ export default {
         return "X";
       }
     },
+
+    /**
+     * Funkcija sustabdanti žaidimą esant laimėtojui arba lygiosioms.
+     * Parametrai:
+     *  winnerPlayer: Kuris žaidėjas laimėjo
+     * Galimi variantai:
+     *  true:   Jei laimėjo O
+     *  false:  Jei laimėjo X
+     *  null:   Jei lygiosios
+     */
     gameOver(winnerPlayer) {
       this.winner = winnerPlayer;
       this.gameEnd = true;
     },
+
+    /**
+     * Funkcija paleidžianti žaidimą iš naujo.
+     */
     restart() {
       // Atstatom kintamuosius į pradinę padėtį.
       this.playerTurn = false;
@@ -225,6 +266,8 @@ export default {
         this.items[a].fill(null);
       }
       this.actions = [];
+
+      // Kreipiamės į backend ir ištrinam esančius duomenis apie žaidėjų veiksmus.
       this.$api
         .post("actions", {
           _method: "delete",
