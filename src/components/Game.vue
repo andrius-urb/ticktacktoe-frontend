@@ -18,7 +18,6 @@
     <br />
     <div>
       <button @click="restart()">Pradėti iš naujo</button>
-      <button @click="testApi()">Test API</button>
     </div>
     <br />
     <div class="container">
@@ -58,6 +57,23 @@ export default {
       gameEnd: false, // true, jei žaidimas baigtas.
       actions: [],
     };
+  },
+  beforeMount() {
+    var vm = this;
+    this.$api
+      .get("actions")
+      .then((res) => {
+        console.log(res.data);
+        res.data.forEach(function (tblrow) {
+          console.log(tblrow.player);
+          vm.actions.push([tblrow.row, tblrow.column, tblrow.player]);
+          Vue.set(vm.items[tblrow.row], tblrow.column, tblrow.player);
+          vm.playerTurn = !tblrow.player;
+        });
+      })
+      .catch((err) => {
+        console.log(err);
+      });
   },
   watch: {
     items: {
@@ -165,6 +181,19 @@ export default {
       this.actions.push([x, n, this.playerTurn]);
       //console.table(this.actions);
       Vue.set(this.items[x], n, this.playerTurn);
+      this.$api
+        .post("action", {
+          player: this.playerTurn,
+          row: x,
+          col: n,
+        })
+        .then(function (response) {
+          console.log(response);
+        })
+        .catch(function (error) {
+          console.log(error);
+        });
+
       //this.items[x][n] = this.playerTurn;
       this.playerTurn = !this.playerTurn;
       //console.table(this.items);
@@ -192,19 +221,18 @@ export default {
         this.items[a].fill(null);
       }
       this.actions = [];
-    },
-    testApi() {
       this.$api
-        .get("test")
-        .then((res) => {
-          console.log(res);
+        .post("actions", {
+          _method: "delete",
         })
-        .catch((err) => {
-          console.log(err);
+        .then(function (response) {
+          console.log(response);
+        })
+        .catch(function (error) {
+          console.log(error);
         });
     },
   },
-  mounted() {},
 };
 </script>
 
