@@ -63,9 +63,14 @@ export default {
     this.$api
       .get("actions")
       .then((res) => {
-        console.log(res.data);
         res.data.forEach(function (tblrow) {
-          console.log(tblrow.player);
+          /**
+           * Gautus duomenis iš duomenų bazės priskiriam "actions" kintamajam, kur registruojami atlikti veiksmai.
+           * Taip pat, pagal gautus duomenis sudeliojame "items" masyvą, kur registruojama, kuris žaidėjas, kuriame laukelyje
+           * atliko veiksmą.
+           * Pabaigoje priskiriame playerTurn kintamąjį priešingai reikšmei, negu duomenų bazėje nurodyta, nes jeigu paskutinį veiksmą atliko
+           * X žaidėjas, tuomet dabar eilė O žaidėjui. */
+
           vm.actions.push([tblrow.row, tblrow.column, tblrow.player]);
           Vue.set(vm.items[tblrow.row], tblrow.column, tblrow.player);
           vm.playerTurn = !tblrow.player;
@@ -171,7 +176,6 @@ export default {
   },
   methods: {
     doClick(x, n) {
-      //console.log("clicked " + x + " and " + n);
       if (this.gameEnd) {
         return alert("Žaidimas baigtas!");
       }
@@ -224,9 +228,6 @@ export default {
       this.$api
         .post("actions", {
           _method: "delete",
-        })
-        .then(function (response) {
-          console.log(response);
         })
         .catch(function (error) {
           console.log(error);
