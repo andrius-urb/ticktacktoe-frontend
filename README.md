@@ -15,6 +15,8 @@ After installing all dependencies, run
 npm run serve
 ```
 
+Start backend server(see below instructions).
+
 Go to http://localhost:8080 and play!
 
 ## Backend installation
