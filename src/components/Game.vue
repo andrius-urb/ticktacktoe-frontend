@@ -191,6 +191,7 @@ export default {
      */
     restart() {
       // Atstatom kintamuosius į pradinę padėtį.
+      this.canDoMoves = false;
       this.playerTurn = "X";
       this.winner = " ";
       this.gameEnd = false;
@@ -200,12 +201,16 @@ export default {
       this.actions = [];
 
       // Kreipiamės į backend ir ištrinam esančius duomenis apie žaidėjų veiksmus.
+      var vm = this;
       this.$api
         .post("actions", {
           _method: "delete",
         })
         .catch(function (error) {
           console.log(error);
+        })
+        .then(function () {
+          vm.canDoMoves = true;
         });
     },
   },
