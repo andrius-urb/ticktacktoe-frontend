@@ -7,12 +7,12 @@
           v-for="n in 3"
           :key="n"
           @click="doClick(x - 1, n - 1)"
-        >{{ isItZeroOrCross(items[x-1][n-1]) }}</div>
+        >{{ items[x-1][n-1] }}</div>
         <!---->
       </div>
     </div>
     <div v-if="this.gameEnd == true">
-      <div v-if="this.winner !== null">{{ (this.winner) ? 'Laimėjo O' : 'Laimėjo X' }}</div>
+      <div v-if="this.winner !== ' '">{{ 'Laimėjo '+ this.winner }}</div>
       <div v-else>Lygiosios!</div>
     </div>
     <br />
@@ -25,7 +25,7 @@
         class="row"
         v-for="action in this.actions.slice().reverse()"
         :key="action[2]+'-'+action[0]+'-'+action[1]"
-      >{{ (action[2]) ? 'Žaidėjas O' : 'Žaidėjas X' }} padarė veiksmą laukelyje {{ action[0] }}, {{ action[1] }}</div>
+      >{{ 'Žaidėjas '+action[2]+' ' }} padarė veiksmą laukelyje {{ action[0] }}, {{ action[1] }}</div>
     </div>
   </div>
 </template>
@@ -42,157 +42,81 @@ export default {
         |1,0|1,1|1,2| 
         |2,0|2,1|2,2|
         
-        * null - laukelis laisvas
-        * false - laukelyje X(iksiukas)
-        * true  - laukelyje O(nuliukas)
+        * " " - laukelis laisvas
+        * "X" - laukelyje X(iksiukas)
+        * "O"  - laukelyje O(nuliukas)
     
        */
       items: [
-        [null, null, null],
-        [null, null, null],
-        [null, null, null],
+        [" ", " ", " "],
+        [" ", " ", " "],
+        [" ", " ", " "],
       ],
-      playerTurn: false, // false - X eilė. true - O eilė
-      winner: null, // laimėtojas. false - X, true - O, null - nėra laimėtojo.
-      gameEnd: false, // true, jei žaidimas baigtas.
+      playerTurn: "X", // kurio žaidėjo eilė.
+      winner: null, // Nurodomas laimėtojas. "X" arba "O", jeigu yra " ", reiškia lygiosios
+      gameEnd: false, // true, jei žaidimas baigtas. Tik esant šio kintamojo TRUE reikšmei, žiūrima kintamasis "winner"
 
       /**
-       * TRUE, jei sukelti praeito žaidimo duomenys.
-       * FALSE, jei nesukelti.
+       * TRUE, jei galima atlikti veiksmus.
+       * FALSE, jei negalima.
        * Paleidžiant puslapį kreipiamasi į backend, siekiant rasti buvusius veiksmus ir užpildyti lentelę,
        * jeigu tokių veiksmų buvo rasta. Kol duomenys negauti, šis kintamasi yra FALSE ir neleidžia atlikti jokio
        * veiksmo lentelėje.
+       *
+       * Taip pat kai atliekamas veiksmas, kol negautas atsakymas iš backend, neleidžia nieko daryti.
        */
-      lastGameDataAssigned: false,
+      canDoMoves: false,
       actions: [],
     };
   },
   beforeMount() {
-    /**
-     * Prieš paleidžiant puslapį, kreipiamės į backend ir ieškome, ar buvo prieš tai atlikta veiksmų.
-     * Jeigu veiksmų yra, reiškia žaidimas yra prasidėjęs ir laimėtojas yra arba ne, tačiau žaidimas nebuvo paleistas iš naujo,
-     * todėl žaidimas tęsiamas.
-     */
-    var vm = this;
-    this.$api
-      .get("actions")
-      .then((res) => {
-        res.data.forEach(function (tblrow) {
-          /**
-           * Gautus duomenis iš duomenų bazės priskiriam "actions" kintamajam, kur registruojami atlikti veiksmai.
-           * Taip pat, pagal gautus duomenis sudeliojame "items" masyvą, kur registruojama, kuris žaidėjas, kuriame laukelyje
-           * atliko veiksmą.
-           * Pabaigoje priskiriame playerTurn kintamąjį priešingai reikšmei, negu duomenų bazėje nurodyta, nes jeigu paskutinį veiksmą atliko
-           * X žaidėjas, tuomet dabar eilė O žaidėjui. */
-
-          vm.actions.push([tblrow.row, tblrow.column, tblrow.player]);
-          Vue.set(vm.items[tblrow.row], tblrow.column, tblrow.player);
-          vm.playerTurn = !tblrow.player;
-        });
-        vm.lastGameDataAssigned = true; // Nurodome, kad praeito žaidimo duomenys sėkmingai sukelti.
-      })
-      .catch((err) => {
-        console.log(err);
-      });
-  },
-  watch: {
-    items: {
-      handler() {
-        // tikriname ar kažkuris žaidėjas laimėjo
-
-        var isX = false; // žaidėjas X masyve "items" žymimas "false"
-        var isO = true; // žaidėjas O masyve "items" žymimas "true"
-        var checkPlayer = isX; // nurodo, kurį žaidėją tikrina ciklas
-        var result = true; // rezultatas, prieš pradedant naują tikrinimą, turi būti "true"
-
-        /**
-         * Tikriname įstrižai 0,0  1,1  2,2 laukelius
-         */
-        for (var b = 0; b < 2; b++) {
-          // Šis ciklas pirmą kartą tikrina X žaidėja, antrą kartą O žaidėją.
-          result = true;
-          if (b == 1) checkPlayer = isO; // ciklas veikia antrą kartą, kuomet tikriname O žaidėją. Priskiriam kintamąjį checkPlayer į isO(true).
-          for (var a = 0; a < 3; a++) {
-            /**
-             * Kadangi kintamasis result = true, tai tikrinant turi būti:
-             * result = true && true, tam kad gautume rezultatą jog yra laimėtojas(nes true && true yra TRUE)
-             * jeigu sąlyga kitokia, pvž:
-             * result = true && false, laimėtojo nėra(nes true && false yra FALSE)
-             */
-            result = result && this.items[a][a] == checkPlayer;
-          }
-
-          if (result) {
-            /**
-             * result = true, reiškia yra laimėtojas.
-             * Laimėtojas bus tas, kurį paskutinį tikrino ciklas. Jį nurodo kintamasis checkPlayer.
-             * Perduodame laimėtoją funkcijai.
-             */
-            return this.gameOver(checkPlayer);
-          }
-        }
-
-        /**
-         * Tikriname įstrižai 2,0  1,1  0,2 laukelius
-         */
-        checkPlayer = isX;
-        for (b = 0; b < 2; b++) {
-          result = true;
-          if (b == 1) checkPlayer = isO;
-          for (a = 0; a < 3; a++) {
-            result = result && this.items[2 - a][a] == checkPlayer;
-          }
-          if (result) {
-            return this.gameOver(checkPlayer);
-          }
-        }
-
-        checkPlayer = isX;
-        for (b = 0; b < 2; b++) {
-          if (b == 1) checkPlayer = isO;
-          for (a = 0; a < 3; a++) {
-            result = true;
-            for (var c = 0; c < 3; c++) {
-              /**
-               * Tikrinam linijas
-               */
-              result = result && this.items[a][c] == checkPlayer;
-            }
-            if (result) {
-              return this.gameOver(checkPlayer);
-            }
-            result = true;
-            for (c = 0; c < 3; c++) {
-              /**
-               * Tikrinam stulpelius
-               */
-              result = result && this.items[c][a] == checkPlayer;
-            }
-            if (result) {
-              return this.gameOver(checkPlayer);
-            }
-          }
-        }
-
-        /** Nei viena sąlyga nepatenkinta, reiškia dar nėra laimėtojo,
-         * tikriname ar neužimta visi laukeliai
-         */
-        var count = 0;
-        for (a = 0; a < 3; a++) {
-          count = count + this.items[a].filter((item) => item === null).length;
-          /**
-           * Jeigu randa bent vieną "null" reikšmę masyve "items", prie count pridedame rastą kiekį.
-           * "null" reikšmė reiškia, kad laukelis neužimtas nei X, nei O */
-        }
-        if (count == 0) {
-          // Jeigu "count" 0, t.y. nėra nei vienos "null" reikšmės masyve "items", reiškia, kad visi laukeliai užimti, ir laimėtojo nėra.
-          return this.gameOver(null);
-        }
-      },
-      deep: true,
-    },
+    this.fillBoardFromDatabase();
   },
   methods: {
+    /**
+     * Funkcija duomenų įkėlimui iš duomenų bazės.
+     */
+    fillBoardFromDatabase() {
+      /**
+       * Prieš paleidžiant puslapį, kreipiamės į backend ir ieškome, ar buvo prieš tai atlikta veiksmų.
+       * Jeigu veiksmų yra, reiškia žaidimas yra prasidėjęs ir laimėtojas yra arba ne, tačiau žaidimas nebuvo paleistas iš naujo,
+       * todėl žaidimas tęsiamas.
+       */
+      var vm = this;
+      this.$api
+        .get("actions")
+        .then((res) => {
+          res.data.forEach(function (tblrow) {
+            /**
+             * Gautus duomenis iš duomenų bazės priskiriam "actions" kintamajam, kur registruojami atlikti veiksmai.
+             * Taip pat, pagal gautus duomenis sudeliojame "items" masyvą, kur registruojama, kuris žaidėjas, kuriame laukelyje
+             * atliko veiksmą.
+             * Pabaigoje priskiriame playerTurn kintamąjį priešingai reikšmei, negu duomenų bazėje nurodyta, nes jeigu paskutinį veiksmą atliko
+             * X žaidėjas, tuomet dabar eilė O žaidėjui. */
+
+            vm.actions.push([tblrow.row, tblrow.column, tblrow.player]);
+            Vue.set(vm.items[tblrow.row], tblrow.column, tblrow.player);
+            vm.playerTurn = tblrow.player === "X" ? "O" : "X";
+          });
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+
+      this.$api
+        .get("check")
+        .then((res) => {
+          if (res.data.winner) {
+            //vm.winner = res.data.winner;
+            //vm.gameEnd = true;
+            this.gameOver(res.data.winner);
+          }
+          vm.canDoMoves = true; // Nurodome, kad galima atlikti veiksmus lentelėje.
+        })
+        .catch((err) => {
+          console.log(err);
+        });
+    },
     /***
      * Funkcija, kuri vykdoma paspaudus ant bet kurio laukelio
      * Parametrai:
@@ -200,7 +124,7 @@ export default {
      *  n:  Stulpelis
      */
     doClick(x, n) {
-      if (!this.lastGameDataAssigned) {
+      if (!this.canDoMoves) {
         // Jeigu praeito žaidimo duomenys nesukelti, jeigu tokių buvo, neleisti jokio veiksmo.
         return;
       }
@@ -209,50 +133,43 @@ export default {
         // Jeigu žaidimas pasibaigęs, pranešame.
         return alert("Žaidimas baigtas!");
       }
-      if (this.items[x][n] !== null) {
-        // Jeigu paspaustas laukelis nėra "null", t.y. jau užimtas, pranešame.
+      if (this.items[x][n] !== " ") {
+        // Jeigu paspaustas laukelis nėra " ", t.y. jau užimtas, pranešame.
         return alert("Laukelis užimtas!");
       }
-
+      this.canDoMoves = false;
       // Į "actions" kintamąjį perduodame atliktą veiksmą, kuris žaidėjas, ant kurio laukelio paspaudė.
       this.actions.push([x, n, this.playerTurn]);
 
-      // Pakeičiame masyvo "items" atitinkamoje vietoje reikšmę į false arba true, priklausomai, kurio žaidėjo eilė (this.playerTurn)
+      // Pakeičiame masyvo "items" atitinkamoje vietoje reikšmę į X arba O, priklausomai, kurio žaidėjo eilė (this.playerTurn)
       Vue.set(this.items[x], n, this.playerTurn);
 
       // Siunčiame duomenis į backend, kad įrašytų veiksmą į duomenų bazę
+      var vm = this;
       this.$api
         .post("action", {
           player: this.playerTurn,
           row: x,
           col: n,
         })
+        .then((res) => {
+          if (res.data.winner) {
+            // Jeigu yra laimėtojas arba lygiosios, nurodom, kad žaidimas baigtas.
+            this.gameOver(res.data.winner);
+          }
+        })
         .catch(function (error) {
+          vm.actions.pop();
+          Vue.set(vm.items[x], n, " ");
+          vm.fillBoardFromDatabase();
           console.log(error);
+        })
+        .then(function () {
+          vm.canDoMoves = true; // Nurodom, kad galima daryti veiksmus su lentele, net jei ir žaidimas baigtas, nes žaidimo pabaigos atveju, nieko daryti neleidžia "gameEnd = true"
         });
 
       //  Pakeičiame "playerTurn" kintamąjį į priešingą buvusiam, taip nurodydami, kad dabar kito žaidėjo eilė.
-      this.playerTurn = !this.playerTurn;
-    },
-
-    /**
-     * Funkcija grąžinanti X, O arba jokio rezultato.
-     * Parametrai:
-     *  value:  Reikšmė, pagal kurią duodamas rezultatas.
-     * Galimi variantai:
-     *  null:   Grąžina tuščią tekstą
-     *  true:   Grąžina "O"
-     *  false:  Grąžina "X"
-     */
-    isItZeroOrCross(value) {
-      if (value === null) {
-        return "";
-      } else {
-        if (value) {
-          return "O";
-        }
-        return "X";
-      }
+      this.playerTurn = this.playerTurn === "X" ? "O" : "X";
     },
 
     /**
@@ -274,11 +191,11 @@ export default {
      */
     restart() {
       // Atstatom kintamuosius į pradinę padėtį.
-      this.playerTurn = false;
-      this.winner = null;
+      this.playerTurn = "X";
+      this.winner = " ";
       this.gameEnd = false;
       for (var a = 0; a < 3; a++) {
-        this.items[a].fill(null);
+        this.items[a].fill(" ");
       }
       this.actions = [];
 
